@@ -9,5 +9,6 @@ class JobPosting(BaseModel):
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
     salary_currency: Optional[str] = None
+    salary_period: Optional[Literal["hour", "day", "month", "year"]] = None
     skills: list[str] = Field(default_factory=list)
     years_experience: Optional[int] = None

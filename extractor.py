@@ -1,4 +1,5 @@
-import sys
+import json, sys
+from pathlib import Path
 from ollama import chat
 from pydantic import ValidationError
 from schema import JobPosting
@@ -8,7 +9,18 @@ MODEL = "qwen3.5:4b"
 SYSTEM = (
     "You extract structured data from job postings. "
     "Output only the JSON object. No explanations, no commentary. "
-    "Use null for anything not explicitly stated. Never guess."
+    "Use null for anything not explicitly stated. Never guess.\n"
+    "Rules:\n"
+    "- Salary: record the numbers exactly as written, plus the currency "
+    "and the pay period (hour, day, month, or year). "
+    "If only one figure is given, put it in both salary_min and salary_max. "
+    "If no pay is stated, use null for all salary fields.\n"
+    "- Remote: use 'remote' only if the posting says remote or work from home, "
+    "'hybrid' only if it mentions a mix, and 'onsite' only if it requires "
+    "being in an office. Otherwise null.\n"
+    "- Skills: list the abilities or qualifications the job requires of the "
+    "candidate, in lowercase. Do not list devices, accounts, or software "
+    "merely needed to do the task unless the posting names them as a required skill.\n"
 )
 
 class ExtractionError(Exception):
@@ -38,5 +50,11 @@ def extract(text: str, max_retries: int = 2) -> JobPosting:
     raise ExtractionError("Could not get valid output after retries")
 
 if __name__ == "__main__":
-    text = open(sys.argv[1], encoding="utf-8").read()
-    print(extract(text).model_dump_json(indent=2))
+    path = Path(sys.argv[1])
+    result = extract(path.read_text(encoding="utf-8")).model_dump()
+
+    sources_file = path.parent / "sources.json"
+    sources = json.loads(sources_file.read_text(encoding="utf-8")) if sources_file.exists() else {}
+    result["source_url"] = sources.get(path.name)
+
+    print(json.dumps(result, indent=2))
