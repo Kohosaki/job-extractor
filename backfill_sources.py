@@ -14,7 +14,7 @@ for q in queries:
         except Exception as e:
             print(f"{src.__name__} failed: {e}")
 
-for f in sorted(OUT.glob("[0-9]*.txt")):
+for f in sorted(OUT.glob("[!_]*.txt")):
     if f.name in sources:
         continue
     lines = f.read_text(encoding="utf-8").split("\n")

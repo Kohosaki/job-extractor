@@ -46,13 +46,30 @@ def from_arbeitnow(query, limit):
         if n >= limit:
             break
 
+def slugify(s):
+    s = re.sub(r"[^a-z0-9]+", "-", (s or "").lower()).strip("-")
+    return s[:50] or "unknown"
+
+def unique_name(company, title):
+    """telus-digital.txt, or telus-digital-content-reviewer.txt if taken, then -2, -3..."""
+    name = f"{slugify(company)}.txt"
+    if not (OUT / name).exists():
+        return name
+    stem = f"{slugify(company)}-{slugify(title)}"
+    name, n = f"{stem}.txt", 2
+    while (OUT / name).exists():
+        name = f"{stem}-{n}.txt"
+        n += 1
+    return name
+
 def main(query, limit=10):
     OUT.mkdir(parents=True, exist_ok=True)
     seen_file = OUT / "_seen_urls.txt"
     seen = set(seen_file.read_text().split()) if seen_file.exists() else set()
     sources_file = OUT / "sources.json"
     sources = json.loads(sources_file.read_text(encoding="utf-8")) if sources_file.exists() else {}
-    next_id = len(list(OUT.glob("[0-9]*.txt"))) + 1
+    nums = [int(f.stem) for f in OUT.glob("[0-9]*.txt") if f.stem.isdigit()]
+    next_id = max(nums, default=0) + 1
     saved = 0
 
     for source in (from_remotive, from_arbeitnow):
@@ -64,12 +81,14 @@ def main(query, limit=10):
         for job in jobs:
             if job["url"] in seen:
                 continue
-            text = (f"{job['title']}\n{job['company']}\n{job['location']}\n"
-                    f"{job['salary']}\n\n{html_to_text(job['description'])}")
-            (OUT / f"{next_id:03d}.txt").write_text(text, encoding="utf-8")
-            sources[f"{next_id:03d}.txt"] = job["url"]
+            text = (f"Company: {job['company']}\n{job['title']}\n{job['company']}\n"
+                    f"{job['location']}\n{job['salary']}\n\n"
+                    f"{html_to_text(job['description'])}")
+            name = f"{next_id:03d}.txt"
+            (OUT / name).write_text(text, encoding="utf-8")
+            sources[name] = job["url"]
             seen.add(job["url"])
-            print(f"saved {next_id:03d}.txt  {job['title']} @ {job['company']}")
+            print(f"saved {name}  {job['company']} ({job['title']})")
             next_id += 1
             saved += 1
     seen_file.write_text("\n".join(seen))
